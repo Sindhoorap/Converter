@@ -198,4 +198,4 @@ async function LoadFile(filename) {
 
 }
 
-LoadFile("../example.ifc");
+LoadFile("./example.ifc");
