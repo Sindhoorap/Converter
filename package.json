@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "three": "^0.156.1",
-    "web-ifc": "^0.0.43"
+    "web-ifc": "^0.0.44"
   },
   "type": "module"
 }
