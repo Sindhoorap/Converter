@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "filereader": "^0.10.3",
     "three": "^0.156.1",
     "web-ifc": "^0.0.44"
   },
