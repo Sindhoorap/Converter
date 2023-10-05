@@ -531,7 +531,6 @@ class GLTFWriter {
 		const extensionsRequired = writer.extensionsRequired;
 
 		// Merge buffers.
-		console.log(buffers);
 		const blob = new Blob( buffers, { type: 'application/octet-stream' } );
 
 		// Declare extensions.
