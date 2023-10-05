@@ -24,8 +24,7 @@ import {
 	CompressedTexture,
 	Vector3
 } from 'three';
-import {Blob} from 'node:buffer';
-import FileReader from 'filereader';
+import { Blob, FileReader } from 'vblob';
 import { decompress } from 'three/examples/jsm/utils/TextureUtils.js';
 
 
@@ -532,6 +531,7 @@ class GLTFWriter {
 		const extensionsRequired = writer.extensionsRequired;
 
 		// Merge buffers.
+		console.log(buffers);
 		const blob = new Blob( buffers, { type: 'application/octet-stream' } );
 
 		// Declare extensions.
@@ -597,9 +597,15 @@ class GLTFWriter {
 			if ( json.buffers && json.buffers.length > 0 ) {
 
 				
-				let buffer = Buffer.from(await blob.text()).toString('base64');
-				json.buffers[ 0 ].uri = buffer;
-				onDone(json);
+				const reader = new FileReader();
+				reader.readAsDataURL( blob );
+				reader.onloadend = function () {
+
+					const base64data = reader.result;
+					json.buffers[ 0 ].uri = base64data;
+					onDone( json );
+
+				};
 
 			} else {
 

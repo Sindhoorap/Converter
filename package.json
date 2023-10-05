@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "filereader": "^0.10.3",
     "three": "^0.156.1",
+    "vblob": "^1.1.0",
     "web-ifc": "^0.0.44"
   },
   "type": "module"
