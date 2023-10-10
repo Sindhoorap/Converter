@@ -1,7 +1,10 @@
 import * as THREE from "three";
 import { readFileSync, writeFileSync } from "fs";
 import { IfcAPI } from "web-ifc";
-import { GLTFExporter } from "./GLTFExporter.js";
+import { Blob, FileReader } from 'vblob';
+global.Blob = Blob;
+global.FileReader = FileReader;
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 console.log("Hello web-ifc-node!");
