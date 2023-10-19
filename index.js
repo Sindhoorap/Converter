@@ -178,10 +178,15 @@ async function convert(fileName) {
     const file = fileName.replace(".ifc", ".gltf");
     const gltf = readJSONSync(`./output/gltfFiles/${file}`);
     const glbOptions = {};
-    // const dracoGltfOptions = {};
 
+    const options = {
+  dracoOptions: {
+    compressionLevel: 10,
+  },
+};
     const glbResult = await gltfToGlb(gltf, glbOptions);
-    const dracoResult = await processGltf(gltf);
+    const gltf2 = readJSONSync(`./output/gltfFiles/${file}`);
+    const dracoResult = await processGltf(gltf2,options);
 
     const file1 = fileName.replace(".ifc", "");
     const outputFolderGlb = "./output/glbFiles";
