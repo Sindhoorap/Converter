@@ -1,39 +1,44 @@
 import * as THREE from "three";
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, readdirSync, mkdirSync } from "fs";
 import { IfcAPI } from "web-ifc";
-import { Blob, FileReader } from 'vblob';
+import { Blob, FileReader } from "vblob";
 global.Blob = Blob;
 global.FileReader = FileReader;
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-
+import pkgFS from "fs-extra";
+const { readJSONSync, writeFileSync, writeJSONSync } = pkgFS;
+import pkgGLTF from "gltf-pipeline";
+const { gltfToGlb, processGltf } = pkgGLTF;
 console.log("Hello web-ifc-node!");
 
 const ifcAPI = new IfcAPI();
-// const fs = require('fs')
+
 async function LoadFile(filename) {
   // load model data as a string
-  const data = readFileSync(filename); // Read IFC file as a string
+  const data = readFileSync(`./ifcfiles/${filename}`); // Read IFC file as a string
   await ifcAPI.Init();
   let modelID = ifcAPI.OpenModel(data);
 
   let geometries = [];
   let transparentGeometries = [];
 
-  ifcAPI.StreamAllMeshes(modelID, (mesh) => {
-    // only during the lifetime of this function call, the geometry is available in memory
-    const placedGeometries = mesh.geometries;
+  await new Promise((resolve) => {
+    ifcAPI.StreamAllMeshes(modelID, (mesh) => {
+      const placedGeometries = mesh.geometries;
 
-    for (let i = 0; i < placedGeometries.size(); i++) {
-      const placedGeometry = placedGeometries.get(i);
-      let mesh = getPlacedGeometry(modelID, placedGeometry);
-      let geom = mesh.geometry.applyMatrix4(mesh.matrix);
-      if (placedGeometry.color.w !== 1) {
-        transparentGeometries.push(geom);
-      } else {
-        geometries.push(geom);
+      for (let i = 0; i < placedGeometries.size(); i++) {
+        const placedGeometry = placedGeometries.get(i);
+        let mesh = getPlacedGeometry(modelID, placedGeometry);
+        let geom = mesh.geometry.applyMatrix4(mesh.matrix);
+        if (placedGeometry.color.w !== 1) {
+          transparentGeometries.push(geom);
+        } else {
+          geometries.push(geom);
+        }
       }
-    }
+      resolve();
+    });
   });
 
   console.log(
@@ -57,16 +62,25 @@ async function LoadFile(filename) {
 
     const exporter = new GLTFExporter();
 
-    exporter.parse(
-      scene, //doesn't run in node environment because FileReader() is used in GLTFExporter
-      function (gltf) {
-        writeFileSync("output.gltf", JSON.stringify(gltf, null, 2), "utf-8");
-        console.log("GLTF data written to output.gltf");
-      },
-      function (error) {
-        console.log("An error happened during export:", error);
-      }
-    );
+    await new Promise((resolve, reject) => {
+      exporter.parse(
+        scene,
+        (gltf) => {
+          const outputFolder = "./output/gltfFiles";
+          mkdirSync(outputFolder, { recursive: true });
+          const file = filename.replace(".ifc", ".gltf");
+          const outputFilename = `${outputFolder}/${file}`;
+
+          writeFileSync(outputFilename, JSON.stringify(gltf, null, 2), "utf-8");
+          console.log(`GLTF data written to ${outputFilename}`);
+          resolve();
+        },
+        (error) => {
+          console.log("An error happened during export:", error);
+          reject(error);
+        }
+      );
+    });
   }
 }
 
@@ -158,5 +172,46 @@ function ifcGeometryToBuffer(color, vertexData, indexData) {
   return geometry;
 }
 
-// Call the LoadFile function with the IFC file path
-LoadFile("./example.ifc");
+async function convert(fileName) {
+  try {
+    console.log("inside converter");
+    const file = fileName.replace(".ifc", ".gltf");
+    const gltf = readJSONSync(`./output/gltfFiles/${file}`);
+    const glbOptions = {};
+    // const dracoGltfOptions = {};
+
+    const glbResult = await gltfToGlb(gltf, glbOptions);
+    const dracoResult = await processGltf(gltf);
+
+    const file1 = fileName.replace(".ifc", "");
+    const outputFolderGlb = "./output/glbFiles";
+    mkdirSync(outputFolderGlb, { recursive: true });
+    const outputFolderDraco = "./output/dracoGltfFiles";
+    mkdirSync(outputFolderDraco, { recursive: true });
+    writeFileSync(`./output/glbFiles/${file1}.glb`, glbResult.glb);
+    writeJSONSync(
+      `./output/dracoGltfFiles/${file1}-draco.gltf`,
+      dracoResult.gltf
+    );
+  } catch (error) {
+    console.error("An error occurred during conversion:", error);
+  }
+}
+
+// Function to process all IFC files in a directory
+async function processAllIfcFilesInDirectory(directory) {
+  const files = readdirSync(directory);
+  for (const file of files) {
+    if (file.endsWith(".ifc")) {
+      await LoadFile(file);
+      convert(file);
+    }
+  }
+  console.log("Conversion completed successfully.");
+}
+
+// Replace this with your IFC files directory
+const ifcFilesDirectory = "./ifcfiles";
+
+// Call the function to process all IFC files in the directory
+processAllIfcFilesInDirectory(ifcFilesDirectory);
