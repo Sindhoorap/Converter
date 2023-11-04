@@ -7,7 +7,7 @@ global.FileReader = FileReader;
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import pkgFS from "fs-extra";
-const { readJSONSync, writeFileSync, writeJSONSync } = pkgFS;
+const { readJSONSync, writeFileSync, writeJSONSync, statSync } = pkgFS;
 import pkgGLTF from "gltf-pipeline";
 const { gltfToGlb, processGltf } = pkgGLTF;
 console.log("Hello web-ifc-node!");
@@ -82,6 +82,7 @@ async function LoadFile(filename) {
       );
     });
   }
+  return combinedGeometries.length;
 }
 
 function getPlacedGeometry(modelID, placedGeometry) {
@@ -178,16 +179,15 @@ async function convert(fileName) {
     const file = fileName.replace(".ifc", ".gltf");
     const gltf = readJSONSync(`./output/gltfFiles/${file}`);
     const glbOptions = {};
-
     const options = {
-  dracoOptions: {
-    compressionLevel: 10,
-  },
-};
+      dracoOptions: {
+        compressionLevel: 10,
+      },
+    };
+
     const glbResult = await gltfToGlb(gltf, glbOptions);
     const gltf2 = readJSONSync(`./output/gltfFiles/${file}`);
-    const dracoResult = await processGltf(gltf2,options);
-
+    const dracoResult = await processGltf(gltf2, options);
     const file1 = fileName.replace(".ifc", "");
     const outputFolderGlb = "./output/glbFiles";
     mkdirSync(outputFolderGlb, { recursive: true });
@@ -202,21 +202,43 @@ async function convert(fileName) {
     console.error("An error occurred during conversion:", error);
   }
 }
+let totalConversionTime = 0;
 
-// Function to process all IFC files in a directory
+function getFileSizeInMB(filename) {
+  const stats = statSync(filename);
+  const fileSizeInBytes = stats.size;
+  return (fileSizeInBytes / (1024 * 1024)).toFixed(2); // Convert bytes to MB and round to 2 decimal places
+}
+
 async function processAllIfcFilesInDirectory(directory) {
   const files = readdirSync(directory);
   for (const file of files) {
     if (file.endsWith(".ifc")) {
-      await LoadFile(file);
-      convert(file);
+      try {
+        const startTime = new Date();
+        const combinedGeometriesLength = await LoadFile(file);
+        await convert(file);
+        const endTime = new Date();
+        const elapsedTime = endTime - startTime;
+        totalConversionTime += elapsedTime;
+        const conversionInfo = {
+          filename: file,
+          conversionTime: `${totalConversionTime}ms`,
+          combinedGeometries: combinedGeometriesLength,
+          fileSizeMB: getFileSizeInMB(`${directory}/${file}`),
+        };
+        mkdirSync("./output/conversionTimes/", { recursive: true });
+        writeJSONSync(
+          `./output/conversionTimes/${file}-time.json`,
+          conversionInfo
+        );
+      } catch (error) {
+        console.error(`Error processing file ${file}:`, error);
+      }
     }
   }
-  console.log("Conversion completed successfully.");
 }
 
-// Replace this with your IFC files directory
 const ifcFilesDirectory = "./ifcfiles";
 
-// Call the function to process all IFC files in the directory
 processAllIfcFilesInDirectory(ifcFilesDirectory);
