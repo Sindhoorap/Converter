@@ -185,9 +185,15 @@ async function convert(fileName) {
       },
     };
 
+    const startTimeGlb = new Date();
     const glbResult = await gltfToGlb(gltf, glbOptions);
+    const endTimeGlb = new Date();
+
+    const startTimeDraco = new Date();
     const gltf2 = readJSONSync(`./output/gltfFiles/${file}`);
     const dracoResult = await processGltf(gltf2, options);
+    const endTimeDraco = new Date();
+
     const file1 = fileName.replace(".ifc", "");
     const outputFolderGlb = "./output/glbFiles";
     mkdirSync(outputFolderGlb, { recursive: true });
@@ -198,10 +204,20 @@ async function convert(fileName) {
       `./output/dracoGltfFiles/${file1}-draco.gltf`,
       dracoResult.gltf
     );
+
+    return {
+      glbConversionTime: endTimeGlb - startTimeGlb,
+      dracoConversionTime: endTimeDraco - startTimeDraco
+    };
   } catch (error) {
     console.error("An error occurred during conversion:", error);
+    return {
+      glbConversionTime: 0,
+      dracoConversionTime: 0
+    };
   }
 }
+
 let totalConversionTime = 0;
 
 function getFileSizeInMB(filename) {
@@ -215,17 +231,28 @@ async function processAllIfcFilesInDirectory(directory) {
   for (const file of files) {
     if (file.endsWith(".ifc")) {
       try {
-        const startTime = new Date();
+        const startTimeIfc = new Date();
         const combinedGeometriesLength = await LoadFile(file);
-        await convert(file);
-        const endTime = new Date();
-        const elapsedTime = endTime - startTime;
-        totalConversionTime += elapsedTime;
+        const endTimeIfc = new Date();
+
+        const conversionTimes = await convert(file);
+
+        const gltfFilePath = `./output/gltfFiles/${file.replace(".ifc", ".gltf")}`;
+        const glbFilePath = `./output/glbFiles/${file.replace(".ifc", ".glb")}`;
+        const dracoFilePath = `./output/dracoGltfFiles/${file.replace(".ifc", "-draco.gltf")}`;
+
         const conversionInfo = {
           filename: file,
-          conversionTime: `${totalConversionTime}ms`,
+          ifcToGltfTime: endTimeIfc - startTimeIfc,
+          gltfToGlbTime: conversionTimes.glbConversionTime,
+          gltfToDracoGltfTime: conversionTimes.dracoConversionTime,
           combinedGeometries: combinedGeometriesLength,
-          fileSizeMB: getFileSizeInMB(`${directory}/${file}`),
+          fileSizeMB: {
+            ifc: getFileSizeInMB(`${directory}/${file}`),
+            gltf: getFileSizeInMB(gltfFilePath),
+            glb: getFileSizeInMB(glbFilePath),
+            dracoGltf: getFileSizeInMB(dracoFilePath)
+          }
         };
         mkdirSync("./output/conversionTimes/", { recursive: true });
         writeJSONSync(
@@ -240,5 +267,4 @@ async function processAllIfcFilesInDirectory(directory) {
 }
 
 const ifcFilesDirectory = "./ifcfiles";
-
 processAllIfcFilesInDirectory(ifcFilesDirectory);
